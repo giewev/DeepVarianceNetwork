@@ -22,5 +22,10 @@ pip install -r requirements.txt
 ./download_glove.sh
 ```
 
-6. Copy reddit_bipolar.csv data into /src/data dir
+6. Copy [reddit_bipolar.csv](https://drive.google.com/file/d/1tgtztB8PWcz-YS0wR6MH0ik7LVzcNH-N/view?usp=sharing) data into /src/data dir
+
+7. Install spacy
+```
+python -m spacy download en
+```
 
