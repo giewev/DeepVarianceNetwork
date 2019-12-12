@@ -49,7 +49,7 @@ def load_raw_data(data_file_path):
 
 		for row in csv_reader:
 			
-			if len(row)!= 9:
+			if len(row)!= 10:
 				#data was corrupted
 				#TODO Arjun : Check this
 				continue
@@ -71,11 +71,12 @@ def load_raw_data(data_file_path):
 					'link_karma':row[7],
 					'acct_created_at':row[8],
 					"comments":[],
-					"comment_embeddings":[]
+					"comment_embeddings":[],
+					'on_bpd':row[9]
 				}
 			
-			if len(row[3].split(' ')) < MIN_COMMENT_LENGTH:
-				continue
+			# if len(row[3].split(' ')) < MIN_COMMENT_LENGTH:
+			# 	continue
 
 			all_redditors[user_id]['comments'].append({"text":row[3],"timestamp":row[4]})
 			if len(all_redditors[user_id]['comments']) >= COMMENTS_PER_USER:
@@ -208,42 +209,38 @@ def normalize_data(vectorized_data):
 
 class DataCorpus(object):
 	def __init__(self):
-		self.positive_samples = []
-		self.negative_samples = []
+		self.classes = {}
+		self.training_classes = {}
+		self.test_data = []
+
+	def add_sample(self, class_id, sample):
+		if class_id not in self.classes:
+			self.classes[class_id] = []
+
+		self.classes[class_id].append(sample)
 
 	def seperate_test(self, ratio):
-		random.shuffle(self.positive_samples)
-		random.shuffle(self.negative_samples)
-		self.positive_test = self.positive_samples[: int(len(self.positive_samples) * ratio)]
-		self.positive_training = self.positive_samples[int(len(self.positive_samples) * ratio) :]
-		self.negative_test = self.negative_samples[: int(len(self.negative_samples) * ratio)]
-		self.negative_training = self.negative_samples[int(len(self.negative_samples) * ratio) :]
+		smallest_class = min([len(self.classes[cid]) for cid in self.classes])
+		for cid in self.classes:
+			random.shuffle(self.classes[cid])
+			self.test_data.extend(self.classes[cid][: int(smallest_class * ratio)])
+			self.training_classes[cid] = self.classes[cid][int(smallest_class * ratio) :]
 
 	def shuffle(self):
-		random.shuffle(self.positive_test)
-		random.shuffle(self.positive_training)
-		random.shuffle(self.negative_test)
-		random.shuffle(self.negative_training)
+		for cid in self.training_classes:
+			random.shuffle(self.training_classes[cid])
 
-	def batch_count(self, batch_size):
-		return int(min(len(self.positive_training), len(self.negative_training)) / batch_size)
+	def get_batch(self, batch_size):
+		self.shuffle()
+		batch = []
+		for cid in self.training_classes:
+			batch.extend(self.training_classes[cid][:int(batch_size / len(self.classes))])
+
+		return batch
 
 	def test_batch_count(self, batch_size):
-		return int(min(len(self.positive_test), len(self.negative_test)) / batch_size)
-
-	def get_batch(self, batch_index, batch_size):
-		batch_start = batch_index * batch_size
-		positive = self.positive_training[batch_start : batch_start + batch_size]
-		negative = self.negative_training[batch_start : batch_start + batch_size]
-
-		return positive + negative
-
-	def get_test(self):
-		return self.positive_test + self.negative_test
+		return int(len(self.test_data) / batch_size)
 
 	def get_test_batch(self, batch_index, batch_size):
 		batch_start = batch_index * batch_size
-		positive = self.positive_test[batch_start : batch_start + batch_size]
-		negative = self.negative_test[batch_start : batch_start + batch_size]
-
-		return positive + negative
+		return self.test_data[batch_start : batch_start + batch_size]
